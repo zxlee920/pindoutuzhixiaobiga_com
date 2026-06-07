@@ -20,16 +20,20 @@
     .file-upload:hover { border-color: #667eea; background: #f8f8ff; }
     .file-upload input { display: none; }
     .file-info { margin-top: 10px; color: #666; font-size: 13px; }
-    .preview-image { max-width: 100%; max-height: 200px; margin-top: 10px; border-radius: 8px; display: none; }
+    .preview-wrapper { position: relative; display: none; margin-top: 10px; }
+    .preview-image { max-width: 100%; max-height: 200px; margin: 0 auto; border-radius: 8px; display: block; }
+    .preview-delete { position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border: none; border-radius: 50%; background: #dc3545; color: #fff; font-size: 16px; line-height: 24px; text-align: center; cursor: pointer; box-shadow: 0 4px 10px rgba(220, 53, 69, 0.35); }
+    .preview-delete:hover { background: #bb2d3b; }
     .image-controls { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none; }
     .image-size-info { font-size: 13px; color: #666; margin-bottom: 10px; }
     .control-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
     .control-row label { margin: 0; min-width: 80px; }
     .control-row input[type="range"] { flex: 1; }
     .control-row input[type="number"] { width: 80px; }
-    .crop-area { position: relative; margin-top: 10px; border: 2px dashed #667eea; background: #f0f0f0; overflow: hidden; cursor: crosshair; display: none; }
-    .crop-box { position: absolute; border: 2px solid #667eea; background: rgba(102, 126, 234, 0.2); }
-    .crop-handle { position: absolute; width: 10px; height: 10px; background: #667eea; border-radius: 50%; }
+    .crop-area { position: relative; margin-top: 10px; border: 2px dashed #667eea; background: #f0f0f0; overflow: visible; cursor: crosshair; display: none; width: fit-content; line-height: 0; box-sizing: content-box; }
+    #cropCanvas { display: block; }
+    .crop-box { position: absolute; border: 2px solid #667eea; background: rgba(102, 126, 234, 0.2); z-index: 999; }
+    .crop-handle { position: absolute; width: 10px; height: 10px; background: #667eea; border-radius: 50%; z-index: 1000; box-shadow: 0 0 0 2px #fff; }
     .crop-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
     .crop-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
     .crop-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
@@ -67,12 +71,12 @@
 
     <div class="form-group">
       <label for="date">日期 *</label>
-      <input type="date" id="date" onchange="saveToStorage();">
+      <input type="date" id="date">
     </div>
 
     <div class="form-group">
       <label for="author">作者 *</label>
-      <input type="text" id="author" value="拼豆图纸团队" oninput="saveToStorage();">
+      <input type="text" id="author" value="拼豆图纸" oninput="saveToStorage();">
     </div>
 
     <div class="form-group">
@@ -93,7 +97,10 @@
         <input type="file" id="coverFile" accept="image/*">
         <p>点击或拖拽上传封面图</p>
         <div class="file-info" id="coverInfo"></div>
-        <img id="previewImage" class="preview-image" alt="封面图预览">
+        <div class="preview-wrapper" id="previewWrapper">
+          <button class="preview-delete" type="button" onclick="deleteCover(event)" aria-label="删除封面图">×</button>
+          <img id="previewImage" class="preview-image" alt="封面图预览">
+        </div>
       </div>
       <div class="image-controls" id="imageControls">
         <div class="image-size-info" id="imageSizeInfo">原图尺寸: - x -</div>
@@ -147,6 +154,10 @@
     let lastTitle = '';
     const DB_NAME = 'ArticleGeneratorDB';
     const STORE_NAME = 'images';
+
+    function getTodayDateString() {
+      return new Date().toISOString().slice(0, 10);
+    }
 
     function formatFileSize(bytes) {
       if (bytes === 0) return '0 B';
@@ -246,6 +257,21 @@
       }
     }
 
+    async function removeImageFromDB() {
+      try {
+        const db = await initDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete('coverImage');
+        return new Promise((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
     function renderTags() {
       const container = document.getElementById('tagContainer');
       const tagInput = document.getElementById('tagInput');
@@ -272,8 +298,8 @@
         const data = JSON.parse(saved);
         document.getElementById('title').value = data.title || '';
         document.getElementById('description').value = data.description || '';
-        document.getElementById('date').value = data.date || '';
-        document.getElementById('author').value = data.author || '拼豆图纸团队';
+        document.getElementById('date').value = getTodayDateString();
+        document.getElementById('author').value = data.author || '拼豆图纸';
         document.getElementById('content').value = data.content || '';
         tags = data.tags || [];
         renderTags();
@@ -296,18 +322,15 @@
           document.getElementById('compressValue').value = compressRatio;
         }
         
-        if (data.cropRect) {
-          cropRect = data.cropRect;
-        }
-        
         const imageData = await loadImageFromDB();
         if (imageData) {
           coverImageData = imageData.data;
           coverFile = new File([imageData.blob], imageData.name, { type: imageData.type });
           document.getElementById('coverInfo').textContent = '已选择: ' + imageData.name;
+          const previewWrapper = document.getElementById('previewWrapper');
           const preview = document.getElementById('previewImage');
           preview.src = imageData.data;
-          preview.style.display = 'block';
+          previewWrapper.style.display = 'inline-block';
           
           originalImage = new Image();
           originalImage.onload = function() {
@@ -316,6 +339,9 @@
             document.getElementById('imageSizeInfo').textContent = '原图尺寸: ' + originalWidth + ' x ' + originalHeight;
             document.getElementById('imageControls').style.display = 'block';
             initCropCanvas();
+            if (data.cropRect) {
+              cropRect = normalizeCropRectToCanvas(data.cropRect);
+            }
             if (data.isCropping) {
               isCropping = true;
               document.getElementById('cropArea').style.display = 'block';
@@ -330,7 +356,7 @@
         }
         updateFilename();
       } else {
-        document.getElementById('date').valueAsDate = new Date();
+        document.getElementById('date').value = getTodayDateString();
       }
     }
 
@@ -338,7 +364,6 @@
       const data = {
         title: document.getElementById('title').value,
         description: document.getElementById('description').value,
-        date: document.getElementById('date').value,
         author: document.getElementById('author').value,
         content: document.getElementById('content').value,
         tags: tags,
@@ -427,9 +452,10 @@
       const reader = new FileReader();
       reader.onload = async function(e) {
         coverImageData = e.target.result;
+        const previewWrapper = document.getElementById('previewWrapper');
         const preview = document.getElementById('previewImage');
         preview.src = e.target.result;
-        preview.style.display = 'block';
+        previewWrapper.style.display = 'inline-block';
         
         originalImage = new Image();
         originalImage.onload = function() {
@@ -457,7 +483,11 @@
     function downloadMD() {
       const title = document.getElementById('title').value.trim();
       const description = document.getElementById('description').value.trim();
-      const date = document.getElementById('date').value;
+      const dateInput = document.getElementById('date');
+      const date = dateInput.value || getTodayDateString();
+      if (!dateInput.value) {
+        dateInput.value = date;
+      }
       const author = document.getElementById('author').value.trim();
       const content = document.getElementById('content').value.trim();
 
@@ -575,18 +605,21 @@ ${content}
       if (!originalImage || originalWidth === 0 || originalHeight === 0) return;
       
       const canvas = document.getElementById('cropCanvas');
+      const cropArea = document.getElementById('cropArea');
       const maxWidth = 600;
       const scale = Math.min(maxWidth / originalWidth, 1);
       canvas.width = originalWidth * scale;
       canvas.height = originalHeight * scale;
+      cropArea.style.width = canvas.width + 'px';
+      cropArea.style.height = canvas.height + 'px';
       const ctx = canvas.getContext('2d');
       ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
       
       cropRect = {
-        x: 0,
-        y: 0,
-        width: canvas.width,
-        height: canvas.height
+        x: Math.max(10, Math.round(canvas.width * 0.05)),
+        y: Math.max(10, Math.round(canvas.height * 0.05)),
+        width: Math.max(20, canvas.width - Math.max(20, Math.round(canvas.width * 0.1))),
+        height: Math.max(20, canvas.height - Math.max(20, Math.round(canvas.height * 0.1)))
       };
     }
 
@@ -617,6 +650,21 @@ ${content}
       cropBox.style.height = cropRect.height + 'px';
     }
 
+    function normalizeCropRectToCanvas(rect) {
+      const canvas = document.getElementById('cropCanvas');
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        return { x: 0, y: 0, width: 0, height: 0 };
+      }
+
+      const minSize = 20;
+      const width = Math.max(minSize, Math.min(canvas.width, Math.round(rect.width || canvas.width)));
+      const height = Math.max(minSize, Math.min(canvas.height, Math.round(rect.height || canvas.height)));
+      const x = Math.max(0, Math.min(canvas.width - width, Math.round(rect.x || 0)));
+      const y = Math.max(0, Math.min(canvas.height - height, Math.round(rect.y || 0)));
+
+      return { x, y, width, height };
+    }
+
     function initCropEvents() {
       const cropArea = document.getElementById('cropArea');
       const cropBox = document.getElementById('cropBox');
@@ -644,6 +692,9 @@ ${content}
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
         const canvas = document.getElementById('cropCanvas');
+        const minSize = 20;
+        const startRight = startRect.x + startRect.width;
+        const startBottom = startRect.y + startRect.height;
         
         if (isDragging) {
           cropRect.x = Math.max(0, Math.min(canvas.width - cropRect.width, startRect.x + dx));
@@ -651,24 +702,24 @@ ${content}
         } else if (isResizing) {
           switch (resizeHandle) {
             case 'se':
-              cropRect.width = Math.max(20, Math.min(canvas.width - startRect.x, startRect.width + dx));
-              cropRect.height = Math.max(20, Math.min(canvas.height - startRect.y, startRect.height + dy));
+              cropRect.width = Math.max(minSize, Math.min(canvas.width - startRect.x, startRect.width + dx));
+              cropRect.height = Math.max(minSize, Math.min(canvas.height - startRect.y, startRect.height + dy));
               break;
             case 'sw':
-              cropRect.x = Math.max(0, Math.min(startRect.x + startRect.width - 20, startRect.x + dx));
-              cropRect.width = Math.max(20, startRect.width - dx);
-              cropRect.height = Math.max(20, Math.min(canvas.height - startRect.y, startRect.height + dy));
+              cropRect.x = Math.max(0, Math.min(startRight - minSize, startRect.x + dx));
+              cropRect.width = Math.max(minSize, startRight - cropRect.x);
+              cropRect.height = Math.max(minSize, Math.min(canvas.height - startRect.y, startRect.height + dy));
               break;
             case 'ne':
-              cropRect.y = Math.max(0, Math.min(startRect.y + startRect.height - 20, startRect.y + dy));
-              cropRect.width = Math.max(20, Math.min(canvas.width - startRect.x, startRect.width + dx));
-              cropRect.height = Math.max(20, startRect.height - dy);
+              cropRect.y = Math.max(0, Math.min(startBottom - minSize, startRect.y + dy));
+              cropRect.height = Math.max(minSize, startBottom - cropRect.y);
+              cropRect.width = Math.max(minSize, Math.min(canvas.width - startRect.x, startRect.width + dx));
               break;
             case 'nw':
-              cropRect.x = Math.max(0, Math.min(startRect.x + startRect.width - 20, startRect.x + dx));
-              cropRect.y = Math.max(0, Math.min(startRect.y + startRect.height - 20, startRect.y + dy));
-              cropRect.width = Math.max(20, startRect.width - dx);
-              cropRect.height = Math.max(20, startRect.height - dy);
+              cropRect.x = Math.max(0, Math.min(startRight - minSize, startRect.x + dx));
+              cropRect.y = Math.max(0, Math.min(startBottom - minSize, startRect.y + dy));
+              cropRect.width = Math.max(minSize, startRight - cropRect.x);
+              cropRect.height = Math.max(minSize, startBottom - cropRect.y);
               break;
           }
         }
@@ -692,6 +743,44 @@ ${content}
       document.getElementById('cropArea').style.display = 'none';
       document.getElementById('cropBox').style.display = 'none';
       initCropCanvas();
+      saveToStorage();
+    }
+
+    async function deleteCover(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (!coverImageData && !coverFile) {
+        alert('当前没有可删除的封面图');
+        return;
+      }
+
+      coverFile = null;
+      coverImageData = null;
+      originalImage = null;
+      originalWidth = 0;
+      originalHeight = 0;
+      originalFileSize = 0;
+      compressRatio = 100;
+      isCropping = false;
+      cropRect = { x: 0, y: 0, width: 0, height: 0 };
+
+      const previewWrapper = document.getElementById('previewWrapper');
+      const preview = document.getElementById('previewImage');
+      preview.removeAttribute('src');
+      previewWrapper.style.display = 'none';
+      document.getElementById('coverInfo').textContent = '';
+      document.getElementById('imageSizeInfo').textContent = '原图尺寸: - x -';
+      document.getElementById('compressedSizeInfo').textContent = '压缩后尺寸: - x -';
+      document.getElementById('compressRatio').value = 100;
+      document.getElementById('compressValue').value = 100;
+      document.getElementById('cropArea').style.display = 'none';
+      document.getElementById('cropBox').style.display = 'none';
+      document.getElementById('imageControls').style.display = 'none';
+      document.getElementById('coverFile').value = '';
+
+      await removeImageFromDB();
       saveToStorage();
     }
 
