@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拼豆图纸 - 文章生成器</title>
+  <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #868686; min-height: 100vh; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 40px; }
+    h1 { text-align: center; color: #333; margin-bottom: 30px; font-size: 28px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
+    input[type="text"], input[type="date"], textarea { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; }
+    input:focus, textarea:focus { outline: none; border-color: #667eea; }
+    textarea { min-height: 150px; resize: vertical; }
+    .filename-preview { background: #f5f5f5; padding: 10px; border-radius: 6px; font-family: monospace; color: #666; margin-top: 8px; font-size: 13px; }
+    .file-upload { border: 2px dashed #e0e0e0; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s; }
+    .file-upload:hover { border-color: #667eea; background: #f8f8ff; }
+    .file-upload input { display: none; }
+    .file-info { margin-top: 10px; color: #666; font-size: 13px; }
+    .preview-image { max-width: 100%; max-height: 200px; margin-top: 10px; border-radius: 8px; display: none; }
+    .image-controls { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none; }
+    .image-size-info { font-size: 13px; color: #666; margin-bottom: 10px; }
+    .control-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .control-row label { margin: 0; min-width: 80px; }
+    .control-row input[type="range"] { flex: 1; }
+    .control-row input[type="number"] { width: 80px; }
+    .crop-area { position: relative; margin-top: 10px; border: 2px dashed #667eea; background: #f0f0f0; overflow: hidden; cursor: crosshair; display: none; }
+    .crop-box { position: absolute; border: 2px solid #667eea; background: rgba(102, 126, 234, 0.2); }
+    .crop-handle { position: absolute; width: 10px; height: 10px; background: #667eea; border-radius: 50%; }
+    .crop-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+    .crop-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+    .crop-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+    .crop-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+    .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4); }
+    .btn-secondary { background: #6c757d; }
+    .btn-secondary:hover { background: #5a6268; box-shadow: 0 10px 20px rgba(108, 117, 125, 0.4); }
+    .btn-group { display: flex; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
+    .info-box { background: #e8f4f8; border-left: 4px solid #17a2b8; padding: 15px; border-radius: 6px; margin-top: 30px; }
+    .info-box h3 { color: #17a2b8; margin-bottom: 10px; font-size: 16px; }
+    .info-box p { color: #555; line-height: 1.6; margin-bottom: 8px; }
+    .info-box code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; color: #d63384; }
+    .tag-input-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px; min-height: 48px; }
+    .tag-input-container:focus-within { border-color: #667eea; }
+    .tag { background: #667eea; color: white; padding: 4px 10px; border-radius: 16px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .tag-remove { cursor: pointer; font-weight: bold; }
+    .tag-input { border: none; outline: none; flex: 1; min-width: 100px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 拼豆图纸 - 文章生成器</h1>
+    
+    <div class="form-group">
+      <label for="title">SEO标题 *</label>
+      <input type="text" id="title" placeholder="输入文章标题" oninput="updateFilename(); saveToStorage();">
+      <div class="filename-preview" id="filenamePreview">文件名: 自动生成</div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">SEO描述 *</label>
+      <input type="text" id="description" placeholder="文章简短描述" oninput="saveToStorage();">
+    </div>
+
+    <div class="form-group">
+      <label for="date">日期 *</label>
+      <input type="date" id="date" onchange="saveToStorage();">
+    </div>
+
+    <div class="form-group">
+      <label for="author">作者 *</label>
+      <input type="text" id="author" value="拼豆图纸团队" oninput="saveToStorage();">
+    </div>
+
+    <div class="form-group">
+      <label>标签 *</label>
+      <div class="tag-input-container" id="tagContainer">
+        <input type="text" class="tag-input" id="tagInput" placeholder="输入标签后按回车键确定添加">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="content">内容 *</label>
+      <textarea id="content" placeholder="输入文章内容（支持 Markdown 格式）" oninput="saveToStorage();"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>封面图 *</label>
+      <div class="file-upload" id="coverUpload">
+        <input type="file" id="coverFile" accept="image/*">
+        <p>点击或拖拽上传封面图</p>
+        <div class="file-info" id="coverInfo"></div>
+        <img id="previewImage" class="preview-image" alt="封面图预览">
+      </div>
+      <div class="image-controls" id="imageControls">
+        <div class="image-size-info" id="imageSizeInfo">原图尺寸: - x -</div>
+        <div class="image-size-info" id="compressedSizeInfo">压缩后尺寸: - x -</div>
+        <div class="control-row">
+          <label>压缩比例:</label>
+          <input type="range" id="compressRatio" min="10" max="100" value="100" oninput="updateCompressValue();">
+          <input type="number" id="compressValue" min="10" max="100" value="100" oninput="updateCompressSlider();">
+          <span>%</span>
+        </div>
+        <div class="control-row">
+          <button class="btn" onclick="toggleCrop()" style="padding: 8px 16px; font-size: 14px;">裁剪图片</button>
+          <button class="btn btn-secondary" onclick="resetImage()" style="padding: 8px 16px; font-size: 14px;">重置</button>
+        </div>
+        <div class="crop-area" id="cropArea">
+          <canvas id="cropCanvas"></canvas>
+          <div class="crop-box" id="cropBox" style="display: none;">
+            <div class="crop-handle nw"></div>
+            <div class="crop-handle ne"></div>
+            <div class="crop-handle sw"></div>
+            <div class="crop-handle se"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn" onclick="downloadMD()">下载 MD 文件</button>
+      <button class="btn btn-secondary" onclick="downloadCover()">下载封面图</button>
+    </div>
+
+    <div class="info-box">
+      <h3>📁 文件放置说明</h3>
+      <p>1. 将下载的 <code>.md</code> 文件放到项目的 <code>src/content/</code> 目录下</p>
+      <p>2. 将下载的封面图放到项目的 <code>public/images/</code> 目录下</p>
+    </div>
+  </div>
+
+  <script>
+    let tags = [];
+    let coverFile = null;
+    let coverImageData = null;
+    let originalImage = null;
+    let originalWidth = 0;
+    let originalHeight = 0;
+    let originalFileSize = 0;
+    let compressRatio = 100;
+    let isCropping = false;
+    let cropRect = { x: 0, y: 0, width: 0, height: 0 };
+    let randomSuffix = '';
+    let lastTitle = '';
+    const DB_NAME = 'ArticleGeneratorDB';
+    const STORE_NAME = 'images';
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getCompressedDimensions() {
+      if (!originalWidth || !originalHeight) return { width: 0, height: 0 };
+      let width = originalWidth;
+      let height = originalHeight;
+      
+      if (isCropping && cropRect.width > 0 && cropRect.height > 0) {
+        const canvas = document.getElementById('cropCanvas');
+        if (canvas) {
+          const scaleX = originalWidth / canvas.width;
+          const scaleY = originalHeight / canvas.height;
+          width = cropRect.width * scaleX;
+          height = cropRect.height * scaleY;
+        }
+      }
+      
+      const ratio = compressRatio / 100;
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      
+      return { width, height };
+    }
+
+    function estimateCompressedSize() {
+      if (!originalFileSize || !originalWidth || !originalHeight) return '-';
+      const dims = getCompressedDimensions();
+      const areaRatio = (dims.width * dims.height) / (originalWidth * originalHeight);
+      
+      // 使用面积比例估算，但考虑压缩效率通常不是线性的
+      // 添加一个修正系数，因为压缩通常比线性更有效
+      const efficiencyFactor = 0.85; // 压缩效率系数
+      let estimatedSize = originalFileSize * areaRatio * efficiencyFactor;
+      
+      return formatFileSize(estimatedSize);
+    }
+
+    function updateCompressedSizeInfo() {
+      const dims = getCompressedDimensions();
+      const sizeText = dims.width > 0 ? `${dims.width} x ${dims.height}` : '-';
+      document.getElementById('compressedSizeInfo').textContent = `压缩后尺寸: ${sizeText}`;
+    }
+
+    function generateRandomSuffix() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+      });
+    }
+
+    async function saveImageToDB(data) {
+      const db = await initDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(data, 'coverImage');
+      return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function loadImageFromDB() {
+      try {
+        const db = await initDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get('coverImage');
+        return new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function renderTags() {
+      const container = document.getElementById('tagContainer');
+      const tagInput = document.getElementById('tagInput');
+      const existingTags = container.querySelectorAll('.tag');
+      existingTags.forEach(t => t.remove());
+      
+      tags.forEach((tag, index) => {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'tag';
+        tagEl.innerHTML = tag + '<span class="tag-remove" onclick="removeTag(' + index + ')">×</span>';
+        container.insertBefore(tagEl, tagInput);
+      });
+    }
+
+    function removeTag(index) {
+      tags.splice(index, 1);
+      renderTags();
+      saveToStorage();
+    }
+
+    async function loadFromStorage() {
+      const saved = localStorage.getItem('articleGeneratorData');
+      if (saved) {
+        const data = JSON.parse(saved);
+        document.getElementById('title').value = data.title || '';
+        document.getElementById('description').value = data.description || '';
+        document.getElementById('date').value = data.date || '';
+        document.getElementById('author').value = data.author || '拼豆图纸团队';
+        document.getElementById('content').value = data.content || '';
+        tags = data.tags || [];
+        renderTags();
+        
+        if (data.randomSuffix) {
+          randomSuffix = data.randomSuffix;
+        } else {
+          randomSuffix = generateRandomSuffix();
+        }
+        if (data.title) {
+          lastTitle = data.title;
+        }
+        if (data.originalFileSize) {
+          originalFileSize = data.originalFileSize;
+        }
+        
+        if (data.compressRatio !== undefined) {
+          compressRatio = data.compressRatio;
+          document.getElementById('compressRatio').value = compressRatio;
+          document.getElementById('compressValue').value = compressRatio;
+        }
+        
+        if (data.cropRect) {
+          cropRect = data.cropRect;
+        }
+        
+        const imageData = await loadImageFromDB();
+        if (imageData) {
+          coverImageData = imageData.data;
+          coverFile = new File([imageData.blob], imageData.name, { type: imageData.type });
+          document.getElementById('coverInfo').textContent = '已选择: ' + imageData.name;
+          const preview = document.getElementById('previewImage');
+          preview.src = imageData.data;
+          preview.style.display = 'block';
+          
+          originalImage = new Image();
+          originalImage.onload = function() {
+            originalWidth = originalImage.width;
+            originalHeight = originalImage.height;
+            document.getElementById('imageSizeInfo').textContent = '原图尺寸: ' + originalWidth + ' x ' + originalHeight;
+            document.getElementById('imageControls').style.display = 'block';
+            initCropCanvas();
+            if (data.isCropping) {
+              isCropping = true;
+              document.getElementById('cropArea').style.display = 'block';
+              document.getElementById('cropBox').style.display = 'block';
+              updateCropBox();
+              initCropEvents();
+            }
+          };
+          originalImage.src = imageData.data;
+        } else if (data.coverFileName) {
+          document.getElementById('coverInfo').textContent = '上次选择: ' + data.coverFileName + ' (需重新上传)';
+        }
+        updateFilename();
+      } else {
+        document.getElementById('date').valueAsDate = new Date();
+      }
+    }
+
+    function saveToStorage() {
+      const data = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        date: document.getElementById('date').value,
+        author: document.getElementById('author').value,
+        content: document.getElementById('content').value,
+        tags: tags,
+        coverFileName: coverFile ? coverFile.name : null,
+        compressRatio: compressRatio,
+        isCropping: isCropping,
+        cropRect: cropRect,
+        randomSuffix: randomSuffix,
+        originalFileSize: originalFileSize
+      };
+      localStorage.setItem('articleGeneratorData', JSON.stringify(data));
+    }
+
+    (async function() {
+      await loadFromStorage();
+      updateFilename();
+    })();
+
+    function updateFilename() {
+      const title = document.getElementById('title').value;
+      if (!title) {
+        document.getElementById('filenamePreview').textContent = '文件名: 自动生成';
+        return;
+      }
+      if (title !== lastTitle) {
+        lastTitle = title;
+        randomSuffix = generateRandomSuffix();
+        saveToStorage();
+      }
+      try {
+        let filename = pinyinPro.pinyin(title, { toneType: 'none', type: 'array' }).join('');
+        filename = filename.replace(/[^a-zA-Z0-9]/g, '');
+        document.getElementById('filenamePreview').textContent = '文件名: ' + filename + '-' + randomSuffix + '.md';
+      } catch (e) {
+        document.getElementById('filenamePreview').textContent = '文件名: 正在加载拼音库...';
+      }
+    }
+
+    const tagInput = document.getElementById('tagInput');
+    tagInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && this.value.trim()) {
+        e.preventDefault();
+        const tag = this.value.trim();
+        if (!tags.includes(tag)) {
+          tags.push(tag);
+          renderTags();
+          saveToStorage();
+        }
+        this.value = '';
+      }
+    });
+
+    const coverUpload = document.getElementById('coverUpload');
+    const coverFileInput = document.getElementById('coverFile');
+    
+    coverUpload.addEventListener('click', () => coverFileInput.click());
+    coverUpload.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      coverUpload.classList.add('dragover');
+    });
+    coverUpload.addEventListener('dragleave', () => {
+      coverUpload.classList.remove('dragover');
+    });
+    coverUpload.addEventListener('drop', (e) => {
+      e.preventDefault();
+      coverUpload.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+    coverFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('请上传图片文件');
+        return;
+      }
+      coverFile = file;
+      originalFileSize = file.size;
+      document.getElementById('coverInfo').textContent = '已选择: ' + file.name + ' (' + formatFileSize(file.size) + ')';
+      
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        coverImageData = e.target.result;
+        const preview = document.getElementById('previewImage');
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        
+        originalImage = new Image();
+        originalImage.onload = function() {
+          originalWidth = originalImage.width;
+          originalHeight = originalImage.height;
+          document.getElementById('imageSizeInfo').textContent = '原图尺寸: ' + originalWidth + ' x ' + originalHeight;
+          document.getElementById('imageControls').style.display = 'block';
+          initCropCanvas();
+          updateCompressedSizeInfo();
+        };
+        originalImage.src = e.target.result;
+        
+        await saveImageToDB({
+          data: e.target.result,
+          name: file.name,
+          type: file.type,
+          blob: file
+        });
+      };
+      reader.readAsDataURL(file);
+      
+      saveToStorage();
+    }
+
+    function downloadMD() {
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const date = document.getElementById('date').value;
+      const author = document.getElementById('author').value.trim();
+      const content = document.getElementById('content').value.trim();
+
+      if (!title || !description || !date || !author || !content) {
+        alert('请填写所有必填项');
+        return;
+      }
+
+      if (tags.length === 0) {
+        alert('请至少添加一个标签');
+        return;
+      }
+
+      let filename = 'article.md';
+      let imageFilename = '';
+      if (!randomSuffix) {
+        randomSuffix = generateRandomSuffix();
+      }
+      try {
+        let pinyinName = pinyinPro.pinyin(title, { toneType: 'none', type: 'array' }).join('');
+        pinyinName = pinyinName.replace(/[^a-zA-Z0-9]/g, '');
+        filename = pinyinName + '-' + randomSuffix + '.md';
+        if (coverFile) {
+          const ext = coverFile.name.split('.').pop();
+          imageFilename = pinyinName + '-' + randomSuffix + '.' + ext;
+        }
+      } catch (e) {
+        filename = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '') + '-' + randomSuffix + '.md';
+        if (coverFile) {
+          imageFilename = coverFile.name;
+        }
+      }
+
+      const mdContent = `---
+title: '${title}'
+description: '${description}'
+date: '${date}'
+author: '${author}'
+tags: ${JSON.stringify(tags)}
+image: /images/${imageFilename}
+---
+
+${content}
+`;
+
+      const blob = new Blob([mdContent], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadCover() {
+      if (!coverImageData) {
+        alert('请先上传封面图');
+        return;
+      }
+
+      const title = document.getElementById('title').value.trim();
+      if (!title) {
+        alert('请先填写标题，封面图文件名需要基于标题生成');
+        return;
+      }
+
+      const processedImage = processImage();
+      if (!processedImage) {
+        alert('图片处理失败');
+        return;
+      }
+
+      let filename = coverFile.name;
+      if (!randomSuffix) {
+        randomSuffix = generateRandomSuffix();
+      }
+      try {
+        let pinyinName = pinyinPro.pinyin(title, { toneType: 'none', type: 'array' }).join('');
+        pinyinName = pinyinName.replace(/[^a-zA-Z0-9]/g, '');
+        const ext = coverFile.name.split('.').pop();
+        filename = pinyinName + '-' + randomSuffix + '.' + ext;
+      } catch (e) {
+        filename = coverFile.name;
+      }
+
+      const a = document.createElement('a');
+      a.href = processedImage;
+      a.download = filename;
+      a.click();
+    }
+
+    function updateCompressValue() {
+      const slider = document.getElementById('compressRatio');
+      const input = document.getElementById('compressValue');
+      input.value = slider.value;
+      compressRatio = parseInt(slider.value);
+      updateCompressedSizeInfo();
+      saveToStorage();
+    }
+
+    function updateCompressSlider() {
+      const slider = document.getElementById('compressRatio');
+      const input = document.getElementById('compressValue');
+      let value = parseInt(input.value);
+      if (value < 10) value = 10;
+      if (value > 100) value = 100;
+      input.value = value;
+      slider.value = value;
+      compressRatio = value;
+      updateCompressedSizeInfo();
+      saveToStorage();
+    }
+
+    function initCropCanvas() {
+      if (!originalImage || originalWidth === 0 || originalHeight === 0) return;
+      
+      const canvas = document.getElementById('cropCanvas');
+      const maxWidth = 600;
+      const scale = Math.min(maxWidth / originalWidth, 1);
+      canvas.width = originalWidth * scale;
+      canvas.height = originalHeight * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+      
+      cropRect = {
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height
+      };
+    }
+
+    function toggleCrop() {
+      isCropping = !isCropping;
+      const cropArea = document.getElementById('cropArea');
+      const cropBox = document.getElementById('cropBox');
+      
+      if (isCropping) {
+        cropArea.style.display = 'block';
+        cropBox.style.display = 'block';
+        initCropCanvas();
+        updateCropBox();
+        initCropEvents();
+      } else {
+        cropArea.style.display = 'none';
+        cropBox.style.display = 'none';
+      }
+      updateCompressedSizeInfo();
+      saveToStorage();
+    }
+
+    function updateCropBox() {
+      const cropBox = document.getElementById('cropBox');
+      cropBox.style.left = cropRect.x + 'px';
+      cropBox.style.top = cropRect.y + 'px';
+      cropBox.style.width = cropRect.width + 'px';
+      cropBox.style.height = cropRect.height + 'px';
+    }
+
+    function initCropEvents() {
+      const cropArea = document.getElementById('cropArea');
+      const cropBox = document.getElementById('cropBox');
+      let isDragging = false;
+      let isResizing = false;
+      let resizeHandle = null;
+      let startX, startY, startRect;
+
+      cropBox.onmousedown = function(e) {
+        if (e.target.classList.contains('crop-handle')) {
+          isResizing = true;
+          resizeHandle = e.target.className.split(' ')[1];
+        } else {
+          isDragging = true;
+        }
+        startX = e.clientX;
+        startY = e.clientY;
+        startRect = { ...cropRect };
+        e.preventDefault();
+      };
+
+      document.onmousemove = function(e) {
+        if (!isDragging && !isResizing) return;
+        
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const canvas = document.getElementById('cropCanvas');
+        
+        if (isDragging) {
+          cropRect.x = Math.max(0, Math.min(canvas.width - cropRect.width, startRect.x + dx));
+          cropRect.y = Math.max(0, Math.min(canvas.height - cropRect.height, startRect.y + dy));
+        } else if (isResizing) {
+          switch (resizeHandle) {
+            case 'se':
+              cropRect.width = Math.max(20, Math.min(canvas.width - startRect.x, startRect.width + dx));
+              cropRect.height = Math.max(20, Math.min(canvas.height - startRect.y, startRect.height + dy));
+              break;
+            case 'sw':
+              cropRect.x = Math.max(0, Math.min(startRect.x + startRect.width - 20, startRect.x + dx));
+              cropRect.width = Math.max(20, startRect.width - dx);
+              cropRect.height = Math.max(20, Math.min(canvas.height - startRect.y, startRect.height + dy));
+              break;
+            case 'ne':
+              cropRect.y = Math.max(0, Math.min(startRect.y + startRect.height - 20, startRect.y + dy));
+              cropRect.width = Math.max(20, Math.min(canvas.width - startRect.x, startRect.width + dx));
+              cropRect.height = Math.max(20, startRect.height - dy);
+              break;
+            case 'nw':
+              cropRect.x = Math.max(0, Math.min(startRect.x + startRect.width - 20, startRect.x + dx));
+              cropRect.y = Math.max(0, Math.min(startRect.y + startRect.height - 20, startRect.y + dy));
+              cropRect.width = Math.max(20, startRect.width - dx);
+              cropRect.height = Math.max(20, startRect.height - dy);
+              break;
+          }
+        }
+        updateCropBox();
+        updateCompressedSizeInfo();
+        saveToStorage();
+      };
+
+      document.onmouseup = function() {
+        isDragging = false;
+        isResizing = false;
+        resizeHandle = null;
+      };
+    }
+
+    function resetImage() {
+      compressRatio = 100;
+      document.getElementById('compressRatio').value = 100;
+      document.getElementById('compressValue').value = 100;
+      isCropping = false;
+      document.getElementById('cropArea').style.display = 'none';
+      document.getElementById('cropBox').style.display = 'none';
+      initCropCanvas();
+      saveToStorage();
+    }
+
+    function processImage() {
+      if (!originalImage) return null;
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      let targetWidth = originalWidth;
+      let targetHeight = originalHeight;
+      
+      if (compressRatio < 100) {
+        targetWidth = Math.round(originalWidth * compressRatio / 100);
+        targetHeight = Math.round(originalHeight * compressRatio / 100);
+      }
+      
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      
+      if (isCropping && cropRect.width > 0 && cropRect.height > 0) {
+        const cropCanvas = document.getElementById('cropCanvas');
+        const scaleX = originalWidth / cropCanvas.width;
+        const scaleY = originalHeight / cropCanvas.height;
+        
+        const sourceX = cropRect.x * scaleX;
+        const sourceY = cropRect.y * scaleY;
+        const sourceWidth = cropRect.width * scaleX;
+        const sourceHeight = cropRect.height * scaleY;
+        
+        canvas.width = Math.round(sourceWidth * compressRatio / 100);
+        canvas.height = Math.round(sourceHeight * compressRatio / 100);
+        
+        ctx.drawImage(
+          originalImage,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          0, 0, canvas.width, canvas.height
+        );
+      } else {
+        ctx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
+      }
+      
+      return canvas.toDataURL(coverFile.type, 0.9);
+    }
+  </script>
+</body>
+</html>

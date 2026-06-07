@@ -1,0 +1,111 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+import { siteConfig } from '@/config';
+import { getFirstImage } from '@/utils/blog';
+
+const { list } = siteConfig;
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('posts');
+  const postsPerPage = siteConfig.list.postsPerPage;
+  const totalPages = Math.max(1, Math.ceil(allPosts.length / postsPerPage));
+
+  return Array.from({ length: totalPages - 1 }, (_, i) => {
+    const page = i + 2;
+    return {
+      params: { page: String(page) },
+      props: { currentPage: page },
+    };
+  });
+}
+
+const { currentPage } = Astro.props as { currentPage: number };
+const allPosts = await getCollection('posts');
+type BlogPost = (typeof allPosts)[number];
+
+const posts = allPosts.sort(
+  (a: BlogPost, b: BlogPost) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
+
+const postsPerPage = list.postsPerPage;
+const totalPages = Math.max(1, Math.ceil(posts.length / postsPerPage));
+const start = (currentPage - 1) * postsPerPage;
+const pagedPosts = posts.slice(start, start + postsPerPage);
+---
+
+<BaseLayout title={`${list.title} - 第${currentPage}页 | ${siteConfig.site.name}`} description={list.description}>
+  <section class="py-8 md:py-12">
+    <div class="max-w-6xl mx-auto px-4">
+      {pagedPosts.length === 0 ? (
+        <p class="text-center text-gray-400 py-12">暂无图纸</p>
+      ) : (
+        <>
+          <div class="columns-2 lg:columns-3 gap-4 md:gap-6 [column-fill:balance]">
+            {pagedPosts.map((post: BlogPost) => {
+              const cover = getFirstImage(post.body) || post.data.image;
+              return (
+                <a
+                  href={`/${post.id}`}
+                  class="group mb-4 md:mb-6 break-inside-avoid block bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
+                >
+                  {cover && (
+                    <img
+                      src={cover}
+                      alt={post.data.title}
+                      class="w-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div class="p-4">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors line-clamp-2">
+                      {post.data.title}
+                    </h2>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-3">{post.data.description}</p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <nav class="pt-4 flex items-center justify-center gap-2" aria-label="首页分页">
+              <a
+                href={currentPage - 1 === 1 ? '/' : `/page/${currentPage - 1}`}
+                class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:border-primary/40 hover:text-primary transition-colors"
+              >
+                上一页
+              </a>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <a
+                  href={page === 1 ? '/' : `/page/${page}`}
+                  class:list={[
+                    'px-3 py-1.5 text-sm rounded-lg border transition-colors',
+                    page === currentPage
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:border-primary/40 hover:text-primary',
+                  ]}
+                  aria-current={page === currentPage ? 'page' : undefined}
+                >
+                  {page}
+                </a>
+              ))}
+              {currentPage < totalPages ? (
+                <a
+                  href={`/page/${currentPage + 1}`}
+                  class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:border-primary/40 hover:text-primary transition-colors"
+                >
+                  下一页
+                </a>
+              ) : (
+                <span class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500">
+                  下一页
+                </span>
+              )}
+            </nav>
+          )}
+        </>
+      )}
+    </div>
+  </section>
+</BaseLayout>

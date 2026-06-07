@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #9b59b6;
+  --color-primary-dark: #8e44ad;
+  --color-primary-light: #f4ecf7;
+  --color-secondary: #e056fd;
+  --color-accent: #be2edd;
+  --font-sans: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* 暗夜模式过渡动画 */
+body, header, footer, main {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}

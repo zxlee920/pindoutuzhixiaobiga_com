@@ -1,0 +1,83 @@
+---
+import { siteConfig } from '@/config';
+
+const { schema, site, seo, tool, content } = siteConfig;
+const isHome = Astro.url.pathname === '/';
+
+const appSchema = isHome && tool
+  ? {
+      '@context': 'https://schema.org',
+      '@type': schema.type,
+      name: tool.name,
+      description: seo.description,
+      url: site.url,
+      applicationCategory: schema.applicationCategory,
+      operatingSystem: schema.operatingSystem,
+      offers: schema.offers
+        ? {
+            '@type': 'Offer',
+            price: schema.offers.price,
+            priceCurrency: schema.offers.priceCurrency,
+          }
+        : undefined,
+      inLanguage: site.language,
+    }
+  : null;
+
+const faqSchema =
+  isHome && content && content.faq && content.faq.items.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: content.faq.items.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: item.answer,
+          },
+        })),
+      }
+    : null;
+
+const howToSchema =
+  isHome && content && content.howTo && content.howTo.steps.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'HowTo',
+        name: content.howTo.title,
+        step: content.howTo.steps.map((step, i) => ({
+          '@type': 'HowToStep',
+          position: i + 1,
+          name: step.title,
+          text: step.description,
+        })),
+      }
+    : null;
+
+const breadcrumbSchema = isHome && tool
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: '首页',
+          item: site.url,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: tool.name,
+          item: site.url,
+        },
+      ],
+    }
+  : null;
+---
+
+{appSchema && <script type="application/ld+json" set:html={JSON.stringify(appSchema)} />}
+{faqSchema && <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />}
+{howToSchema && <script type="application/ld+json" set:html={JSON.stringify(howToSchema)} />}
+{breadcrumbSchema && <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />}

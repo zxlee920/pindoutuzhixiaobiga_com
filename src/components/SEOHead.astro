@@ -1,0 +1,93 @@
+---
+import { siteConfig } from '@/config';
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+}
+
+const {
+  title = siteConfig.seo.title,
+  description = siteConfig.seo.description,
+  canonical = siteConfig.seo.canonical || siteConfig.site.url,
+} = Astro.props;
+
+const { ogImage } = siteConfig.seo;
+const { site } = siteConfig;
+---
+
+<!-- 基本 Meta -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta name="robots" content="index, follow" />
+<meta name="language" content={site.language} />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:locale" content={site.locale} />
+<meta property="og:site_name" content={site.name} />
+{ogImage && <meta property="og:image" content={`${site.url}${ogImage}`} />}
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+{ogImage && <meta name="twitter:image" content={`${site.url}${ogImage}`} />}
+
+<!-- 百度搜索引擎优化 -->
+<meta name="applicable-device" content="pc,mobile" />
+<meta name="MobileOptimized" content="width" />
+<meta name="HandheldFriendly" content="true" />
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="/favicon.png" />
+
+<!-- Google AdSense -->
+{siteConfig.analytics.adsense && (
+  <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin="anonymous" />
+)}
+{siteConfig.analytics.adsense && (
+  <link rel="preconnect" href="https://googleads.g.doubleclick.net" crossorigin="anonymous" />
+)}
+{siteConfig.analytics.adsense && (
+  <meta name="google-adsense-account" content={siteConfig.analytics.adsense} />
+)}
+
+<!-- 百度统计 -->
+{siteConfig.analytics.baidu && (
+  <script is:inline define:vars={{ baiduId: siteConfig.analytics.baidu }}>
+    window._hmt = window._hmt || [];
+    (function () {
+      const hm = document.createElement('script');
+      hm.src = `https://hm.baidu.com/hm.js?${baiduId}`;
+      hm.async = true;
+      const s = document.getElementsByTagName('script')[0];
+      s?.parentNode?.insertBefore(hm, s);
+    })();
+  </script>
+)}
+
+<!-- Google Analytics -->
+{siteConfig.analytics.google && (
+  <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${siteConfig.analytics.google}`}></script>
+)}
+{siteConfig.analytics.google && (
+  <script is:inline define:vars={{ gaId: siteConfig.analytics.google }}>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', gaId);
+  </script>
+)}
+
+<!-- 自定义统计代码 -->
+{siteConfig.analytics.custom && <Fragment set:html={siteConfig.analytics.custom} />}

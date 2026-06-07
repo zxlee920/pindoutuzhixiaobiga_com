@@ -1,0 +1,458 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+import { getCollection, render } from 'astro:content';
+import { siteConfig } from '@/config';
+import { getFirstImage } from '@/utils/blog';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+const allPosts = await getCollection('posts');
+const currentTags = post.data.tags || [];
+const relatedPosts = allPosts
+  .filter((p) => p.id !== post.id)
+  .map((p) => {
+    const commonTags = (p.data.tags || []).filter((t: string) => currentTags.includes(t));
+    return { post: p, score: commonTags.length };
+  })
+  .sort((a, b) => b.score - a.score || new Date(b.post.data.date).getTime() - new Date(a.post.data.date).getTime())
+  .slice(0, 8)
+  .map((r) => r.post);
+
+function formatDate(date: Date) {
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+const breadcrumbs = [
+  { label: '首页', href: '/' },
+  { label: post.data.title },
+];
+
+const cover = getFirstImage(post.body) || post.data.image;
+const articleUrl = new URL(`/${post.id}/`, siteConfig.site.url).toString();
+const articleImage = cover ? new URL(cover, siteConfig.site.url).toString() : undefined;
+
+const articleSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.date.toISOString(),
+  author: {
+    '@type': 'Person',
+    name: post.data.author || siteConfig.list.defaultAuthor,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: siteConfig.site.name,
+  },
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': articleUrl,
+  },
+  url: articleUrl,
+  image: articleImage,
+};
+---
+
+<BaseLayout
+  title={`${post.data.title} | ${siteConfig.site.name}`}
+  description={post.data.description}
+>
+  <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
+  <Breadcrumb items={breadcrumbs} />
+
+  <article class="py-6 md:py-10">
+    <div class="max-w-3xl mx-auto px-4">
+      <header class="mb-10">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          {post.data.title}
+        </h1>
+        <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 dark:text-gray-500">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+            {post.data.author || siteConfig.list.defaultAuthor}
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+          </span>
+          {post.data.tags && (
+            <div class="flex flex-wrap gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" /></svg>
+              {post.data.tags.map((tag: string) => (
+                <a
+                  href={`/tag/${encodeURIComponent(tag)}`}
+                  class="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-primary/10 hover:text-primary px-2 py-0.5 rounded text-xs transition-colors"
+                >
+                  {tag}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div class="mb-6 sticky top-16 z-30">
+        <div class="flex items-center gap-3 p-2 rounded-xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 backdrop-blur">
+          <button
+            onclick="history.back()"
+            class="inline-flex items-center justify-center flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:border-primary/40 hover:text-primary transition-colors cursor-pointer"
+          >
+            ← 返回
+          </button>
+          {cover && (
+            <a
+              href={cover}
+              download
+              class="inline-flex items-center justify-center gap-2 flex-1 px-4 py-2 rounded-lg bg-primary text-white font-semibold text-sm shadow-lg shadow-primary/30 hover:bg-primary-dark transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 10l5 5m0 0l5-5m-5 5V3" /></svg>
+              下载图纸
+            </a>
+          )}
+        </div>
+      </div>
+
+      {cover && (
+        <section class="mb-8 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+          <div class="overflow-auto bg-gray-50 dark:bg-gray-900">
+            <img
+              id="detail-cover-image"
+              src={cover}
+              alt={`${post.data.title} 图纸预览`}
+              class="w-full max-h-[70vh] object-contain cursor-zoom-in select-none"
+              draggable="false"
+            />
+          </div>
+          <p class="px-4 py-2 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700">
+            点击图片可弹层放大查看
+          </p>
+        </section>
+      )}
+
+      <div
+        id="image-lightbox"
+        class="fixed inset-0 z-80 hidden items-center justify-center bg-black/80 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="图纸大图预览"
+      >
+        <div class="absolute top-4 left-4 flex items-center gap-2">
+          <button
+            id="image-lightbox-zoom-out"
+            type="button"
+            class="w-9 h-9 rounded-full bg-white/15 text-white hover:bg-white/25 transition-colors"
+            aria-label="缩小"
+          >
+            −
+          </button>
+          <button
+            id="image-lightbox-zoom-in"
+            type="button"
+            class="w-9 h-9 rounded-full bg-white/15 text-white hover:bg-white/25 transition-colors"
+            aria-label="放大"
+          >
+            +
+          </button>
+          <button
+            id="image-lightbox-zoom-reset"
+            type="button"
+            class="px-3 h-9 rounded-full bg-white/15 text-white text-sm hover:bg-white/25 transition-colors"
+            aria-label="重置缩放"
+          >
+            重置
+          </button>
+        </div>
+        <button
+          id="image-lightbox-close"
+          type="button"
+          class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 text-white hover:bg-white/25 transition-colors"
+          aria-label="关闭预览"
+        >
+          ✕
+        </button>
+        <div id="image-lightbox-stage" class="w-full h-full flex items-center justify-center overflow-hidden touch-none">
+          <img
+            id="image-lightbox-image"
+            src={cover || ''}
+            alt={`${post.data.title} 图纸大图`}
+            class="max-w-full max-h-full object-contain cursor-zoom-in select-none transition-transform duration-75 origin-center will-change-transform"
+            draggable="false"
+          />
+        </div>
+      </div>
+
+      <div class="prose prose-gray dark:prose-invert max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary dark:prose-code:text-blue-400 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-pre:bg-gray-900 dark:prose-pre:bg-gray-950 prose-img:rounded-xl prose-table:text-sm">
+        <Content />
+      </div>
+    </div>
+  </article>
+
+  {relatedPosts.length > 0 && (
+    <section class="py-12 bg-gray-50 dark:bg-gray-800/50">
+      <div class="max-w-6xl mx-auto px-4">
+        <h2 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">相关图纸</h2>
+        <div class="columns-2 lg:columns-3 gap-4 md:gap-6 [column-fill:balance]">
+          {relatedPosts.map((rp) => {
+            const relatedCover = getFirstImage(rp.body) || rp.data.image;
+            return (
+              <a
+                href={`/${rp.id}`}
+                class="group mb-4 md:mb-6 break-inside-avoid block bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
+              >
+                {relatedCover && (
+                  <img
+                    src={relatedCover}
+                    alt={rp.data.title}
+                    class="w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <div class="p-4">
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors line-clamp-2">
+                    {rp.data.title}
+                  </h3>
+                  <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-3">{rp.data.description}</p>
+                </div>
+              </a>
+            );
+          })}
+          <button
+            onclick="history.back()"
+            class="group mb-4 md:mb-6 break-inside-avoid block bg-white dark:bg-gray-800 border border-dashed border-primary/40 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary transition-all cursor-pointer w-full"
+          >
+            <div class="h-full min-h-40 p-4 flex items-center justify-center">
+              <span class="text-base font-semibold text-primary group-hover:scale-105 transition-transform">返回</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+      (() => {
+      const coverImage = document.getElementById('detail-cover-image');
+      const lightbox = document.getElementById('image-lightbox');
+      const lightboxStage = document.getElementById('image-lightbox-stage');
+      const lightboxImage = document.getElementById('image-lightbox-image');
+      const lightboxClose = document.getElementById('image-lightbox-close');
+      const zoomInBtn = document.getElementById('image-lightbox-zoom-in');
+      const zoomOutBtn = document.getElementById('image-lightbox-zoom-out');
+      const zoomResetBtn = document.getElementById('image-lightbox-zoom-reset');
+      if (!coverImage || !lightbox || !lightboxStage || !lightboxImage || !lightboxClose || !zoomInBtn || !zoomOutBtn || !zoomResetBtn) return;
+
+      let scale = 1;
+      const minScale = 1;
+      const maxScale = 4;
+      const step = 0.2;
+      let translateX = 0;
+      let translateY = 0;
+
+      let isPanning = false;
+      let panStartX = 0;
+      let panStartY = 0;
+      let panStartTranslateX = 0;
+      let panStartTranslateY = 0;
+
+      let pinchStartDistance = 0;
+      let pinchStartScale = 1;
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const getTouchDistance = (touchA, touchB) => {
+        const dx = touchA.clientX - touchB.clientX;
+        const dy = touchA.clientY - touchB.clientY;
+        return Math.hypot(dx, dy);
+      };
+
+      const getContainSize = () => {
+        const stageRect = lightboxStage.getBoundingClientRect();
+        const naturalWidth = lightboxImage.naturalWidth || stageRect.width;
+        const naturalHeight = lightboxImage.naturalHeight || stageRect.height;
+        const fitScale = Math.min(stageRect.width / naturalWidth, stageRect.height / naturalHeight);
+        return {
+          stageWidth: stageRect.width,
+          stageHeight: stageRect.height,
+          baseWidth: naturalWidth * fitScale,
+          baseHeight: naturalHeight * fitScale,
+        };
+      };
+
+      const clampTranslate = () => {
+        const { stageWidth, stageHeight, baseWidth, baseHeight } = getContainSize();
+        const scaledWidth = baseWidth * scale;
+        const scaledHeight = baseHeight * scale;
+
+        const maxOffsetX = Math.max(0, (scaledWidth - stageWidth) / 2);
+        const maxOffsetY = Math.max(0, (scaledHeight - stageHeight) / 2);
+
+        translateX = clamp(translateX, -maxOffsetX, maxOffsetX);
+        translateY = clamp(translateY, -maxOffsetY, maxOffsetY);
+      };
+
+      const applyZoom = () => {
+        clampTranslate();
+        lightboxImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        if (scale > 1) {
+          lightboxImage.classList.remove('cursor-zoom-in');
+          lightboxImage.classList.add('cursor-zoom-out');
+        } else {
+          lightboxImage.classList.remove('cursor-zoom-out');
+          lightboxImage.classList.add('cursor-zoom-in');
+        }
+      };
+
+      const openLightbox = () => {
+        const src = coverImage.getAttribute('src') || '';
+        if (!src) return;
+        lightboxImage.setAttribute('src', src);
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        applyZoom();
+        lightbox.classList.remove('hidden');
+        lightbox.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+      };
+
+      const closeLightbox = () => {
+        lightbox.classList.add('hidden');
+        lightbox.classList.remove('flex');
+        document.body.style.overflow = '';
+      };
+
+      coverImage.addEventListener('click', openLightbox);
+      lightboxClose.addEventListener('click', closeLightbox);
+      zoomInBtn.addEventListener('click', () => {
+        scale = Math.min(maxScale, Number((scale + step).toFixed(2)));
+        applyZoom();
+      });
+      zoomOutBtn.addEventListener('click', () => {
+        scale = Math.max(minScale, Number((scale - step).toFixed(2)));
+        applyZoom();
+      });
+      zoomResetBtn.addEventListener('click', () => {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        applyZoom();
+      });
+
+      lightboxStage.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY < 0) {
+          scale = Math.min(maxScale, Number((scale + step).toFixed(2)));
+        } else {
+          scale = Math.max(minScale, Number((scale - step).toFixed(2)));
+        }
+        if (scale === 1) {
+          translateX = 0;
+          translateY = 0;
+        }
+        applyZoom();
+      }, { passive: false });
+
+      lightboxImage.addEventListener('click', (event) => {
+        event.stopPropagation();
+        scale = scale > 1 ? 1 : 2;
+        if (scale === 1) {
+          translateX = 0;
+          translateY = 0;
+        }
+        applyZoom();
+      });
+
+      lightboxStage.addEventListener('mousedown', (event) => {
+        if (scale <= 1) return;
+        isPanning = true;
+        panStartX = event.clientX;
+        panStartY = event.clientY;
+        panStartTranslateX = translateX;
+        panStartTranslateY = translateY;
+      });
+
+      window.addEventListener('mousemove', (event) => {
+        if (!isPanning) return;
+        translateX = panStartTranslateX + (event.clientX - panStartX);
+        translateY = panStartTranslateY + (event.clientY - panStartY);
+        applyZoom();
+      });
+
+      window.addEventListener('mouseup', () => {
+        isPanning = false;
+      });
+
+      lightboxStage.addEventListener('touchstart', (event) => {
+        if (event.touches.length === 2) {
+          pinchStartDistance = getTouchDistance(event.touches[0], event.touches[1]);
+          pinchStartScale = scale;
+          isPanning = false;
+          return;
+        }
+
+        if (event.touches.length === 1 && scale > 1) {
+          isPanning = true;
+          panStartX = event.touches[0].clientX;
+          panStartY = event.touches[0].clientY;
+          panStartTranslateX = translateX;
+          panStartTranslateY = translateY;
+        }
+      }, { passive: false });
+
+      lightboxStage.addEventListener('touchmove', (event) => {
+        if (event.touches.length === 2) {
+          event.preventDefault();
+          const distance = getTouchDistance(event.touches[0], event.touches[1]);
+          if (!pinchStartDistance) pinchStartDistance = distance;
+          const ratio = distance / pinchStartDistance;
+          scale = clamp(Number((pinchStartScale * ratio).toFixed(2)), minScale, maxScale);
+          if (scale === 1) {
+            translateX = 0;
+            translateY = 0;
+          }
+          applyZoom();
+          return;
+        }
+
+        if (event.touches.length === 1 && isPanning && scale > 1) {
+          event.preventDefault();
+          translateX = panStartTranslateX + (event.touches[0].clientX - panStartX);
+          translateY = panStartTranslateY + (event.touches[0].clientY - panStartY);
+          applyZoom();
+        }
+      }, { passive: false });
+
+      lightboxStage.addEventListener('touchend', () => {
+        isPanning = false;
+        pinchStartDistance = 0;
+        pinchStartScale = scale;
+      });
+
+      lightbox.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target === lightbox || target.id === 'image-lightbox-stage') closeLightbox();
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeLightbox();
+      });
+    })();
+    });
+  </script>
+
+</BaseLayout>

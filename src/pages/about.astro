@@ -1,0 +1,38 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+import { siteConfig } from '@/config';
+
+const { about } = siteConfig;
+const breadcrumbs = [
+  { label: '首页', href: '/' },
+  { label: about.title },
+];
+---
+
+<BaseLayout title={`${about.title} | ${siteConfig.site.name}`} description={about.description}>
+  <Breadcrumb items={breadcrumbs} />
+  <section class="py-6 md:py-10">
+    <div class="max-w-3xl mx-auto px-4">
+      <div class="text-center mb-12">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          {about.title}
+        </h1>
+        <p class="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">{about.content}</p>
+      </div>
+
+      {about.sections && about.sections.length > 0 && (
+        <div class="space-y-10">
+          {about.sections.map((section) => (
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 md:p-8">
+              <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                {section.title}
+              </h2>
+              <p class="text-gray-500 dark:text-gray-400 leading-relaxed">{section.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

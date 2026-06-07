@@ -1,0 +1,56 @@
+---
+import { siteConfig } from '@/config';
+
+const { site, nav } = siteConfig;
+---
+
+<header class="sticky top-0 z-50 bg-gradient-to-r from-purple-100/90 to-pink-100/90 dark:from-purple-900/90 dark:to-pink-900/90 backdrop-blur-md border-b-2 border-purple-300 dark:border-purple-700">
+  <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+    <a href="/" class="text-xl font-bold text-purple-800 dark:text-purple-200 hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
+      {site.logo ? <img src={site.logo} alt={site.name} class="h-8 dark:filter-[invert(1)_brightness(2)_grayscale(100%)]" /> : site.name}
+    </a>
+
+    <nav class="hidden md:flex items-center gap-6">
+      {nav.map((item) => (
+        <a
+          href={item.href}
+          class="text-sm text-purple-700 dark:text-purple-300 hover:text-purple-500 dark:hover:text-purple-200 transition-colors font-medium"
+          target={item.external ? '_blank' : undefined}
+          rel={item.external ? 'noopener noreferrer' : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <button
+      id="mobile-menu-btn"
+      class="md:hidden p-2 text-purple-700 dark:text-purple-300"
+      aria-label="菜单"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="mobile-menu" class="hidden md:hidden border-t-2 border-purple-300 dark:border-purple-700 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900">
+    <div class="px-4 py-3 space-y-2">
+      {nav.map((item) => (
+        <a
+          href={item.href}
+          class="block py-2 text-sm text-purple-700 dark:text-purple-300 hover:text-purple-500 dark:hover:text-purple-200 font-medium"
+          target={item.external ? '_blank' : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </div>
+  </div>
+</header>
+
+<script>
+  const btn = document.getElementById('mobile-menu-btn');
+  const menu = document.getElementById('mobile-menu');
+  btn?.addEventListener('click', () => menu?.classList.toggle('hidden'));
+</script>

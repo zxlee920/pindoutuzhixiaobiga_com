@@ -1,0 +1,43 @@
+---
+import SEOHead from '../components/SEOHead.astro';
+import SchemaMarkup from '../components/SchemaMarkup.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import FloatingMenu from '../components/FloatingMenu.astro';
+import { siteConfig } from '@/config';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+}
+
+const { title, description, canonical } = Astro.props;
+---
+
+<!doctype html>
+<html lang={siteConfig.site.language}>
+  <head>
+    <SEOHead title={title} description={description} canonical={canonical || Astro.url.href} />
+    <SchemaMarkup />
+    <script is:inline>
+      // 防止暗夜模式闪烁
+      (function() {
+        const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+      })();
+    </script>
+  </head>
+  <body class="bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 dark:from-purple-950 dark:via-purple-900 dark:to-pink-950 text-purple-900 dark:text-purple-100 antialiased min-h-screen flex flex-col">
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+    <FloatingMenu />
+    {siteConfig.analytics.adsense && (
+      <script is:inline async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${siteConfig.analytics.adsense}`} crossorigin="anonymous"></script>
+    )}
+  </body>
+</html>

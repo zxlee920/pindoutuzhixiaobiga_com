@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import { getCollection } from 'astro:content';
+import { siteConfig } from '@/config';
+import { getFirstImage } from '@/utils/blog';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  const tagSet = new Set<string>();
+  posts.forEach((post) => {
+    (post.data.tags || []).forEach((tag: string) => tagSet.add(tag));
+  });
+  return Array.from(tagSet).map((tag) => ({
+    params: { tag },
+    props: { tag },
+  }));
+}
+
+const { tag } = Astro.props;
+const allPosts = await getCollection('posts');
+type BlogPost = (typeof allPosts)[number];
+const posts = allPosts
+  .filter((p: BlogPost) => (p.data.tags || []).includes(tag))
+  .sort((a: BlogPost, b: BlogPost) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+const postsPerPage = siteConfig.list.postsPerPage;
+const currentPage = 1;
+const totalPages = Math.max(1, Math.ceil(posts.length / postsPerPage));
+const pagedPosts = posts.slice(0, postsPerPage);
+
+const breadcrumbs = [
+  { label: '首页', href: '/' },
+  { label: `# ${tag}` },
+];
+---
+
+<BaseLayout
+  title={`${tag} - ${siteConfig.list.title} | ${siteConfig.site.name}`}
+  description={`关于「${tag}」的所有内容`}
+>
+  <Breadcrumb items={breadcrumbs} />
+
+  <section class="py-6 md:py-10">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="text-center mb-12">
+        <span class="inline-block bg-primary/10 text-primary text-sm font-medium px-3 py-1 rounded-full mb-4">
+          标签
+        </span>
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+          # {tag}
+        </h1>
+        <p class="text-gray-500 dark:text-gray-400">共 {posts.length} 篇文章</p>
+      </div>
+
+      {pagedPosts.length === 0 ? (
+        <p class="text-center text-gray-400 py-12">暂无文章</p>
+      ) : (
+        <div>
+          <div class="columns-2 lg:columns-3 gap-4 md:gap-6 [column-fill:balance]">
+            {pagedPosts.map((post: BlogPost) => {
+              const cover = getFirstImage(post.body) || post.data.image;
+              return (
+                <a
+                  href={`/${post.id}`}
+                  class="group mb-4 md:mb-6 break-inside-avoid block bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
+                >
+                  {cover && (
+                    <img
+                      src={cover}
+                      alt={post.data.title}
+                      class="w-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div class="p-4">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors line-clamp-2">
+                      {post.data.title}
+                    </h2>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-3">{post.data.description}</p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <nav class="pt-2 flex items-center justify-center gap-2" aria-label="标签分页">
+              <span class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500">
+                上一页
+              </span>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <a
+                  href={page === 1 ? `/tag/${encodeURIComponent(tag)}` : `/tag/${encodeURIComponent(tag)}/page/${page}`}
+                  class:list={[
+                    'px-3 py-1.5 text-sm rounded-lg border transition-colors',
+                    page === currentPage
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:border-primary/40 hover:text-primary',
+                  ]}
+                  aria-current={page === currentPage ? 'page' : undefined}
+                >
+                  {page}
+                </a>
+              ))}
+              <a
+                href={`/tag/${encodeURIComponent(tag)}/page/${currentPage + 1}`}
+                class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:border-primary/40 hover:text-primary transition-colors"
+              >
+                下一页
+              </a>
+            </nav>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
